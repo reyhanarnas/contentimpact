@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\ArticleService;
 use App\Services\CategoryService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class HomeController extends Controller
 {
@@ -19,18 +20,29 @@ class HomeController extends Controller
 
     public function index(Request $request)
     {
-        $hero = $this->articleService->getHeroArticle();
-        
-        // Exclude hero from latest if hero exists
-        $latest = $this->articleService->getLatestArticles(7);
+        // Cache homepage data selama 5 menit untuk kurangi beban DB
+        $hero = Cache::remember('home.hero', 300, function () {
+            return $this->articleService->getHeroArticle();
+        });
+
+        $latest = Cache::remember('home.latest', 300, function () {
+            return $this->articleService->getLatestArticles(7);
+        });
+
+        // Exclude hero dari latest jika ada
         if ($hero && $latest->contains('id', $hero->id)) {
             $latest = $latest->filter(fn($art) => $art->id !== $hero->id)->take(6);
         } else {
             $latest = $latest->take(6);
         }
 
-        $popular = $this->articleService->getPopularArticles(5);
-        $categories = $this->categoryService->getCategoriesWithArticleCount();
+        $popular = Cache::remember('home.popular', 300, function () {
+            return $this->articleService->getPopularArticles(5);
+        });
+
+        $categories = Cache::remember('home.categories', 600, function () {
+            return $this->categoryService->getCategoriesWithArticleCount();
+        });
 
         return view('home', compact('hero', 'latest', 'popular', 'categories'));
     }

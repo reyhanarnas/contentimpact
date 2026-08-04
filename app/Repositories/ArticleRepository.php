@@ -60,7 +60,8 @@ class ArticleRepository implements ArticleRepositoryInterface
 
     public function getPublished(int $limit = 10): LengthAwarePaginator
     {
-        return Article::with(['category', 'author'])
+        return Article::with(['category:id,name,slug', 'author:id,name'])
+            ->select(['id','category_id','author_id','title','slug','excerpt','cover_image','status','views','likes','published_at'])
             ->published()
             ->orderBy('published_at', 'desc')
             ->paginate($limit);
@@ -68,7 +69,8 @@ class ArticleRepository implements ArticleRepositoryInterface
 
     public function getPopular(int $limit = 5): Collection
     {
-        return Article::with(['category', 'author'])
+        return Article::with(['category:id,name,slug', 'author:id,name'])
+            ->select(['id','category_id','author_id','title','slug','excerpt','cover_image','status','views','likes','published_at'])
             ->published()
             ->popular()
             ->limit($limit)
@@ -77,8 +79,8 @@ class ArticleRepository implements ArticleRepositoryInterface
 
     public function getHero(): ?Article
     {
-        // The hero is the latest published article with high view count or just the absolute latest published article
-        return Article::with(['category', 'author'])
+        return Article::with(['category:id,name,slug', 'author:id,name'])
+            ->select(['id','category_id','author_id','title','slug','excerpt','cover_image','status','views','likes','published_at'])
             ->published()
             ->orderBy('published_at', 'desc')
             ->first();
@@ -86,7 +88,8 @@ class ArticleRepository implements ArticleRepositoryInterface
 
     public function getLatest(int $limit = 6): Collection
     {
-        return Article::with(['category', 'author'])
+        return Article::with(['category:id,name,slug', 'author:id,name'])
+            ->select(['id','category_id','author_id','title','slug','excerpt','cover_image','status','views','likes','published_at'])
             ->published()
             ->orderBy('published_at', 'desc')
             ->limit($limit)
@@ -119,7 +122,11 @@ class ArticleRepository implements ArticleRepositoryInterface
             $query->whereDate('published_at', $date);
         }
 
-        return $query->orderBy('published_at', 'desc')->paginate(10)->withQueryString();
+        return $query
+            ->select(['id','category_id','author_id','title','slug','excerpt','cover_image','status','views','likes','published_at'])
+            ->orderBy('published_at', 'desc')
+            ->paginate(10)
+            ->withQueryString();
     }
 
     public function getByAuthor(int $authorId): Collection
@@ -172,17 +179,27 @@ class ArticleRepository implements ArticleRepositoryInterface
 
     public function getViewsOverTime(): array
     {
-        // Views over the last 7 days grouped by date
-        $data = [];
+        // Single GROUP BY query instead of 7 separate queries
+        $startDate = Carbon::now()->subDays(6)->startOfDay();
+
+        $rows = DB::table('articles')
+            ->selectRaw('DATE(published_at) as date, SUM(views) as total_views')
+            ->where('published_at', '>=', $startDate)
+            ->where('status', 'published')
+            ->groupByRaw('DATE(published_at)')
+            ->orderBy('date')
+            ->get()
+            ->keyBy('date');
+
+        $labels = [];
+        $data   = [];
         for ($i = 6; $i >= 0; $i--) {
-            $date = Carbon::now()->subDays($i)->format('Y-m-d');
-            $views = Article::whereDate('published_at', $date)->sum('views');
-            $data[$date] = (int)$views;
+            $date     = Carbon::now()->subDays($i)->format('Y-m-d');
+            $labels[] = $date;
+            $data[]   = isset($rows[$date]) ? (int) $rows[$date]->total_views : 0;
         }
-        return [
-            'labels' => array_keys($data),
-            'data' => array_values($data)
-        ];
+
+        return ['labels' => $labels, 'data' => $data];
     }
 
     public function getArticlesPerCategory(): array

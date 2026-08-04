@@ -6,6 +6,7 @@ use App\Repositories\ArticleRepositoryInterface;
 use App\Models\Article;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
@@ -83,7 +84,9 @@ class ArticleService
         $data['status'] = $data['status'] ?? 'draft';
         $data['views'] = 0;
 
-        return $this->articleRepository->create($data);
+        $article = $this->articleRepository->create($data);
+        $this->clearHomeCache();
+        return $article;
     }
 
     public function updateArticle(int $id, array $data, $coverImageFile = null): bool
@@ -110,7 +113,9 @@ class ArticleService
             $data['excerpt'] = Str::limit(strip_tags($data['content']), 150);
         }
 
-        return $this->articleRepository->update($id, $data);
+        $result = $this->articleRepository->update($id, $data);
+        $this->clearHomeCache();
+        return $result;
     }
 
     public function deleteArticle(int $id): bool
@@ -136,10 +141,13 @@ class ArticleService
 
     public function approveArticle(int $id): bool
     {
-        return $this->articleRepository->update($id, [
+        $result = $this->articleRepository->update($id, [
             'status' => 'published',
             'published_at' => Carbon::now(),
         ]);
+        // Hapus cache homepage agar artikel baru langsung muncul
+        $this->clearHomeCache();
+        return $result;
     }
 
     public function requestRevision(int $id, int $editorId, string $note): bool
@@ -188,5 +196,16 @@ class ArticleService
         }
 
         return $slug;
+    }
+
+    /**
+     * Hapus semua cache homepage agar data fresh.
+     */
+    private function clearHomeCache(): void
+    {
+        Cache::forget('home.hero');
+        Cache::forget('home.latest');
+        Cache::forget('home.popular');
+        Cache::forget('home.categories');
     }
 }
