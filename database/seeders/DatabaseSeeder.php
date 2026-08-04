@@ -16,25 +16,22 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // 1. Create Default Users
-        $admin = User::create([
+        $admin = User::firstOrCreate(['email' => 'admin@contentimpact.com'], [
             'name' => 'Admin ContentImpact',
-            'email' => 'admin@contentimpact.com',
             'password' => bcrypt('password'),
             'role' => 'admin',
             'status' => 'active',
         ]);
 
-        $editor = User::create([
+        $editor = User::firstOrCreate(['email' => 'editor@contentimpact.com'], [
             'name' => 'Editor CS',
-            'email' => 'editor@contentimpact.com',
             'password' => bcrypt('password'),
             'role' => 'editor',
             'status' => 'active',
         ]);
 
-        $journalist = User::create([
+        $journalist = User::firstOrCreate(['email' => 'journalist@contentimpact.com'], [
             'name' => 'Journalist Reyhan',
-            'email' => 'journalist@contentimpact.com',
             'password' => bcrypt('password'),
             'role' => 'journalist',
             'status' => 'active',
@@ -73,7 +70,7 @@ class DatabaseSeeder extends Seeder
 
         $categoryModels = [];
         foreach ($categories as $cat) {
-            $categoryModels[] = \App\Models\Category::create($cat);
+            $categoryModels[] = \App\Models\Category::firstOrCreate(['slug' => $cat['slug']], $cat);
         }
 
         // 3. Create Articles
@@ -153,7 +150,7 @@ Sesi latihan 15 menit ini dapat dibagi menjadi beberapa gerakan sederhana: jumpi
 
         $articleModels = [];
         foreach ($articles as $art) {
-            $articleModels[] = \App\Models\Article::create($art);
+            $articleModels[] = \App\Models\Article::firstOrCreate(['slug' => $art['slug']], $art);
         }
 
         // Add a revision record for the article that requires revision
